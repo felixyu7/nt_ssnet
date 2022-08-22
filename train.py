@@ -13,9 +13,7 @@ import os
 
 from ic_ssnet import SparseIceCubeNet
 from ic_dataset import SparseIceCubeDataset
-from ic_dataset import NewSparseIceCubeDataset
 from ic_dataset import ic_data_prep
-from ic_dataset import new_ic_data_prep
 from ic_collate import ic_collate_fn
 
 import yaml
@@ -25,16 +23,14 @@ with open("train.cfg", 'r') as cfg_file:
     cfg = yaml.load(cfg_file, Loader=yaml.FullLoader)
 
 # load data from files
-import time
-
 data_files = sorted(glob.glob(cfg['data_dir'] + ("*.parquet")))[20:]
 
-photons_data, nu_data = new_ic_data_prep(cfg, data_files)
+photons_data, nu_data = ic_data_prep(cfg, data_files)
 
 # initialize network
 net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
 
-dataset = NewSparseIceCubeDataset(photons_data, nu_data)
+dataset = SparseIceCubeDataset(photons_data, nu_data)
 data_train, data_valid = torch.utils.data.random_split(dataset, [len(dataset) - cfg['validation_set_size'], cfg['validation_set_size']])
 train_dataloader = torch.utils.data.DataLoader(data_train, 
                                          batch_size = cfg['batch_size'], 
