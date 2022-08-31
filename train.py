@@ -14,7 +14,7 @@ import os
 from ic_ssnet import SparseIceCubeNet
 from ic_dataset import SparseIceCubeDataset
 from ic_dataset import ic_data_prep
-from ic_collate import ic_collate_fn
+from utils import LogCoshLoss, ic_collate_fn, angle_between
 
 import yaml
 import csv
@@ -23,27 +23,34 @@ with open("train.cfg", 'r') as cfg_file:
     cfg = yaml.load(cfg_file, Loader=yaml.FullLoader)
 
 # load data from files
-data_files = sorted(glob.glob(cfg['data_dir'] + ("*.parquet")))[20:]
-
-photons_data, nu_data = ic_data_prep(cfg, data_files)
+t_photons_data, t_nu_data = ic_data_prep(cfg['train_data_file'])
+v_photons_data, v_nu_data = ic_data_prep(cfg['valid_data_file'])
 
 # initialize network
-net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
+if cfg['pred_cartesian_direction']:
+    net = SparseIceCubeNet(1, 3, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
+else:
+    net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
 
-dataset = SparseIceCubeDataset(photons_data, nu_data)
-data_train, data_valid = torch.utils.data.random_split(dataset, [len(dataset) - cfg['validation_set_size'], cfg['validation_set_size']])
-train_dataloader = torch.utils.data.DataLoader(data_train, 
+train_dataset = SparseIceCubeDataset(t_photons_data, t_nu_data, cfg['pred_cartesian_direction'])
+valid_dataset = SparseIceCubeDataset(v_photons_data, v_nu_data, cfg['pred_cartesian_direction'])
+
+train_dataloader = torch.utils.data.DataLoader(train_dataset, 
                                          batch_size = cfg['batch_size'], 
                                          shuffle=True,
-                                         collate_fn=ic_collate_fn)
-valid_dataloader = torch.utils.data.DataLoader(data_valid, 
+                                         collate_fn=ic_collate_fn,
+                                         num_workers=len(os.sched_getaffinity(0)),
+                                         pin_memory=True)
+valid_dataloader = torch.utils.data.DataLoader(valid_dataset, 
                                          batch_size = cfg['batch_size'], 
                                          shuffle=False,
-                                         collate_fn=ic_collate_fn)
+                                         collate_fn=ic_collate_fn,
+                                         num_workers=len(os.sched_getaffinity(0)),
+                                         pin_memory=True)
 
 
 optimizer = torch.optim.Adam(net.parameters(), lr=cfg['lr'], weight_decay=1e-5)
-criterion = nn.MSELoss()
+criterion = LogCoshLoss
 
 tot_iter = 0
 tot_time = 0
@@ -87,7 +94,7 @@ for epoch in range(epoch_start, cfg['epochs']):
         out, inds = net(inputs)
         optimizer.zero_grad()
         
-        labels = labels[:,0].reshape(-1, 1).float().to(torch.device(cfg['device']))
+        labels = labels[:,1:].reshape(-1, 3).float().to(torch.device(cfg['device']))
         preds = out.F
         loss = criterion(preds, labels)
 
@@ -97,7 +104,7 @@ for epoch in range(epoch_start, cfg['epochs']):
 
         with open(cfg['logs_file'], 'a+') as logs_file:
             writer = csv.writer(logs_file)
-            writer.writerow([tot_iter, (tot_iter * coords.shape[0]) / len(data_train), loss.item()])
+            writer.writerow([tot_iter, (tot_iter * coords.shape[0]) / len(train_dataset), loss.item()])
 
         accum_loss += loss.item()
         accum_iter += 1
