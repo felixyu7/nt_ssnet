@@ -2,7 +2,7 @@
 # Shows how to generate some simple data sets
 # imports
 import sys
-sys.path.append('/n/home12/jlazar/hebe//')
+sys.path.append('/n/home10/felixyu/hebe//')
 from hebe import HEBE, config
 from jax.config import config as jconfig
 
@@ -89,7 +89,7 @@ def initialize_args():
         "--geo_file",
         dest="geo_file",
         type=str,
-        default="/n/home12/jlazar/hebe/hebe/data/icecube-geo",
+        default="/n/home10/felixyu/hebe/hebe/data/icecube-geo",
         help="F2k file describing the geometry of the detector"
     )
     parser.add_argument(
@@ -135,6 +135,7 @@ def main(args):
     else:
         raise ValueError("What's happening here")
     config["detector"]["detector specs file"] = args.geo_file
+    config["detector"]["file name"] = "/n/home10/felixyu/hebe/hebe/data/icecube-f2k"
     config["detector"]["padding"] = args.padding
     config["general"]["random state seed"] = seed
     config["general"]["config location"] = f"{args.output_prefix}/config_{args.final_1}_{args.final_2}_seed_{seed}.json"
@@ -163,7 +164,7 @@ def main(args):
     config['photon propagator'][photo_prop]['ppc_tmpfile'] = args.ppc_tmpfile.replace(".ppc", f"{seed}.ppc")
     config['photon propagator'][photo_prop]['f2k_tmpfile'] = args.f2k_tmpfile.replace(".f2k", f"{seed}.f2k")
     config['photon propagator'][photo_prop]['location'] = "/n/holylfs05/LABS/arguelles_delgado_lab/Lab/common_software/source/PPC_CUDA_new/"
-    config['photon propagator'][photo_prop]['ppctables'] = "/n/home12/jlazar/hebe/PPC_CUDA/"
+    config['photon propagator'][photo_prop]['ppctables'] = "/n/home10/felixyu/hebe/PPC_CUDA/"
     config['photon propagator'][photo_prop]['ppc_exe'] = "/n/holylfs05/LABS/arguelles_delgado_lab/Lab/common_software/source/PPC_CUDA_new/ppc"
     #config['photon propagator'][photo_prop]['supress_output'] = False
     hebe = HEBE(userconfig=config)

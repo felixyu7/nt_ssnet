@@ -8,35 +8,40 @@ import MinkowskiEngine as ME
 from ic_ssnet import SparseIceCubeNet
 from ic_dataset import SparseIceCubeDataset
 from ic_dataset import ic_data_prep
-from ic_collate import ic_collate_fn
+from utils import angle_between, ic_collate_fn
 
 import yaml
 import glob
+import os
 
 # todo
 
 with open("inference.cfg", 'r') as cfg_file:
     cfg = yaml.load(cfg_file, Loader=yaml.FullLoader)
 
-data_files = sorted(glob.glob(cfg['data_dir'] + ("*.parquet")))[0:40]
-
-photons_data, nu_data = ic_data_prep(cfg, data_files)
+# data_files = sorted(glob.glob(cfg['data_dir'] + ("*.parquet")))
+photons_data, nu_data = ic_data_prep(cfg['data_file'])
 
 # initialize network
-net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
+if cfg['pred_cartesian_direction']:
+    net = SparseIceCubeNet(1, 3, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
+else:
+    net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))    
 
-test_dataset = SparseIceCubeDataset(photons_data, nu_data)
+test_dataset = SparseIceCubeDataset(photons_data[:16383], nu_data[:16383], cfg['pred_cartesian_direction'])
 test_dataloader = torch.utils.data.DataLoader(test_dataset, 
                                          batch_size = cfg['batch_size'], 
                                          shuffle=False,
-                                         collate_fn=ic_collate_fn)
+                                         collate_fn=ic_collate_fn,
+                                         num_workers=len(os.sched_getaffinity(0)),
+                                         pin_memory=True)
 
 if cfg['model_weights'] != "":
     checkpoint = torch.load(cfg['model_weights'], map_location=torch.device(cfg['device']))
     net.load_state_dict(checkpoint['model_state_dict'])
 
-preds = torch.Tensor([])
-truth = torch.Tensor([])
+preds = np.empty((0, 3))
+truth = np.empty((0, 3))
 true_e = torch.Tensor([])
 
 if cfg['expand']:
@@ -46,6 +51,15 @@ else:
 
 import time
 times = []
+
+# for i in range(1000):
+#     time_get_item = time.time()
+#     item = test_dataset.__getitem__(i)
+#     times.append(time.time() - time_get_item)
+
+# import pdb; pdb.set_trace()
+
+
 for epoch in range(1):
     test_iter = iter(test_dataloader)
 
@@ -60,28 +74,37 @@ for epoch in range(1):
             start = time.time()
             inputs = ME.SparseTensor(feats.float().reshape(coords.shape[0], -1), coords, 
                                      minkowski_algorithm=algorithm, device=torch.device(cfg['device']))
+            start = time.time()
             out, inds = net(inputs)
-            pred = out.F[inds][:,0]
             times.append(time.time() - start)
-            preds = torch.hstack((preds, pred.cpu()))
-            truth = torch.hstack((truth, labels[:,1]))
+            pred = out.F[inds]
+            preds = np.vstack((preds, pred.cpu().numpy()))
+            truth = np.vstack((truth, labels[:,1:].cpu().numpy()))
             true_e = torch.hstack((true_e, labels[:,0]))
             
 total_time = time.time() - total_time
 print(np.array(times).mean() / cfg['batch_size'])
 print(total_time / len(test_dataset))
 
+angle_diff = []
+for i in range(preds.shape[0]):
+    angle_diff.append(angle_between(preds[i], truth[i]))
+
+import pdb; pdb.set_trace()
+
 import matplotlib.pyplot as plt
 
-cos_zenith_pred = np.cos(preds)
-cos_zenith_truth = np.cos(truth)
-cos_diff = np.array(cos_zenith_pred - cos_zenith_truth)
+# cos_zenith_pred = np.cos(preds)
+# cos_zenith_truth = np.cos(truth)
+cos_zenith_pred = preds[:,2]
+cos_zenith_truth = truth[:,2]
+diff = np.array(cos_zenith_pred - cos_zenith_truth)
 
-plt.hist(cos_diff, bins=100)
+plt.hist(diff, bins=100)
 plt.xlim([-1.5, 1.5])
 plt.xlabel('Reconstructed - Truth (cos(zenith))')
 plt.ylabel('Num Events')
 plt.savefig("./result.png")
 
-print(np.sqrt(np.mean(cos_diff**2)))
-print(np.median(cos_diff))
+print(np.sqrt(np.mean(diff**2)))
+print(np.median(diff))
