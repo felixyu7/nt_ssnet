@@ -106,6 +106,20 @@ def initialize_args():
         default="",
         help="Where to store the lic file. If blank it will be stored at './config.lic'"
     )
+    parser.add_argument(
+        "--ppc_tmpfile",
+        dest="ppc_tmpfile",
+        type=str,
+        default="./.event_hits.ppc.tmp",
+        help="Path where you wanna store PPC temporary files"
+    )
+    parser.add_argument(
+        "--f2k_tmpfile",
+        dest="f2k_tmpfile",
+        type=str,
+        default="./.event_losses.f2k.tmp",
+        help="Path where you wanna store PROPOSAL temporary files"
+    )
     return parser.parse_args()
 
 def main(args):
@@ -146,8 +160,8 @@ def main(args):
     config['photon propagator']['storage location'] = f'{args.output_prefix}/{args.final_1}_{args.final_2}_seed_{seed}_'
     photo_prop = "PPC_CUDA"
     config['photon propagator']['name'] = photo_prop
-    #config['photon propagator'][photo_prop]['ppc_tmpfile'] = args.ppc_tmpfile.replace(".ppc", f"{seed}.ppc")
-    #config['photon propagator'][photo_prop]['f2k_tmpfile'] = args.f2k_tmpfile.replace(".f2k", f"{seed}.f2k")
+    config['photon propagator'][photo_prop]['ppc_tmpfile'] = args.ppc_tmpfile.replace(".ppc", f"{seed}.ppc")
+    config['photon propagator'][photo_prop]['f2k_tmpfile'] = args.f2k_tmpfile.replace(".f2k", f"{seed}.f2k")
     config['photon propagator'][photo_prop]['location'] = "/n/holylfs05/LABS/arguelles_delgado_lab/Lab/common_software/source/PPC_CUDA_new/"
     config['photon propagator'][photo_prop]['ppctables'] = "/n/home12/jlazar/hebe/PPC_CUDA/"
     config['photon propagator'][photo_prop]['ppc_exe'] = "/n/holylfs05/LABS/arguelles_delgado_lab/Lab/common_software/source/PPC_CUDA_new/ppc"
