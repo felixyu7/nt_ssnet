@@ -1,126 +1,99 @@
-import pickle
 import numpy as np
+import noise_box
+import awkward as ak
 
-from utils import Callable, is_floatable
-from noise_box import uncorrelated_noise, correlated_noise
 
-def add_noise(doms, specs):
-    """
-    """
-    tmax = 0
-    outfile = specs['hitsfile'].replace('.ppc', '_noisy.ppc')
+def construct_total_dict(event):
 
-    # Check if thermal rate has depth dependence or not
-    if is_floatable(specs['thermal_rate']):
-        depth_2_rate = Callable(float(specs['thermal_rate']))
-    else: # load pickle
-        with open(specs['thermal_rate'], 'rb') as pkl_f:
-            depth_2_rate = pickle.load(pkl_f)
+    # These are the keys which refer to the physical particles
+    particle_fields = [
+        f for f in event.fields
+        if f not in "event_id mc_truth".split()
+    ]
+    # A set of the all the fields that we should expect
+    fields = set(getattr(event, particle_fields[0]).fields)
+    # Check to make sure all the particles have matching fields
+    # TODO should we just make this a warning and not to the 
+    # offending field
+    for f in particle_fields:
+        set_keys = set(getattr(event, f).fields)
+        if not (
+            fields.issubset(set_keys) and\
+            set_keys.issubset(fields)
+        ):
+            raise ValueError("Particle keys are not compatible.")
+    
+    d = {}
+    for field_k in fields:
+        #nevents = len(fill_dict[particle_fields[0]][field_k])
 
-    with open(specs['hitsfile'], 'r') as fp:
-        with open(outfile, 'w') as of:
-            for line in fp:
-                if 'EE' not in line:
-                    of.write(line)
-                    if 'HIT' in line:
-                        tmax = max(tmax, float(line.split(' ')[3]))
-                # The event is over so let's make some noise
+        # Make an empty array that we will start stacking on
+        total = np.array([])
+        #total = np.array(
+        #    [np.array([]) for _ in range(nevents)]
+        #)
+        # Iterate over all the particles, stacking on total each time
+        for i, k in enumerate(particle_fields):
+            # Don't need to do any special handling
+            if i==0:
+                current = getattr(getattr(event, k), field_k)
+            # If this isn't the first one, we need to filter out [-1] entries
+            # so that they don't crop up in the middle
+            else:
+                #current = [
+                #    x if np.all(x!=-1) else [] for x in getattr(getattr(event, k), field_k)
+                #]
+                if np.all(getattr(getattr(event, k), field_k) == -1):
+                    current = np.array([])
                 else:
-                    of.write('CORRELATED\n')
-                    for dom in doms:
-                        nstr, nom, _ = dom
-                        rate         = specs['radio_rate']
-                        tt           = correlated_noise(rate, tmax, mu=specs['mu'], sigma=specs['sigma'], eta=specs['eta'], rand=specs['rand'])
-                        tmax = max(tmax, max(tt))
-                        for t in tt:
-                            # Make a new line. All light is 400 nm cuz.....
-                            l = f'HIT {nstr} {nom} {t} 400\n'
-                            of.write(l)
-                    of.write('THERMAL\n')
-                    for dom in doms:
-                        nstr, nom, z = dom
-                        rate = depth_2_rate(z)
-                        tt   = uncorrelated_noise(rate, tmax, rand=specs['rand'])
-                        for t in tt:
-                            # Make a new line. All light is 400 nm cuz.....
-                            l = f'HIT {nstr} {nom} {t} 400\n'
-                            of.write(l)
-                    of.write(line)
-    return outfile
+                    getattr(getattr(event, k), field_k)
+            # Add the new stuff to the running total
+            total = ak.concatenate(
+                (total, current),
+                #axis=1
+            )
+        # Throw it all in the dictionary :-)
+        d[field_k] = total
+    return d
 
-if __name__=='__main__':
-    import argparse
-    import os, sys
-
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('-s',
-                        type=int,
-                        help='Seed for random number generator.'
-                       )
-    # Paths to places, etc.
-    parser.add_argument('--hitsfile', 
-                        type=str,
-                        help='Path to hitsfile',
-                        default=''
-                       )
-    parser.add_argument('--geofile', 
-                        dest='geofile', 
-                        default='../MCN/PPC/geo-f2k',
-                        type=str,
-                        help='Path to file with information about DOM geometry'
-                       )
-    parser.add_argument('--thermal_rate',
-                        help='Path to file which has pickled spline for converting depth to rate or constant'
-                       )
-
-    # Parameter for correlated noise as described in https://inspirehep.net/files/147e9132d1d0245895dc407c4dd7505f
-    parser.add_argument('--rate',
-                        dest='rate',
-                        type=float,
-                        default=250,
-                        help='Rate for radioactive events which give correlated noise.'
-                       )
-    parser.add_argument('--mu',
-                        dest='mu',
-                        type=float,
-                        default=-6,
-                        help='Mu parameter described in noise model paper'
-                       )
-    parser.add_argument('--sigma',
-                        dest='sigma',
-                        type=float,
-                        default=2.7,
-                        help='Sigma parameter described in noise model paper'
-                       )
-    parser.add_argument('--eta',
-                        dest='eta',
-                        type=float,
-                        default=8.,
-                        help='Eta parameter described in noise model paper'
-                       )
-    args = parser.parse_args()
-
-    doms = []
-    n = 134314
-    with open(args.geofile, 'r') as gf:
-        for line in gf:
-            spl = line.replace('\n', '').split('\t')
-            nstr = int(spl[5])
-            nom  = int(spl[6])
-            z    = float(spl[4])
-            n = min(nom,n)
-            if nom<=60: # Exclude icetop oms
-                doms.append((nstr, nom, z))
-
-    
-    specs = {}
-    specs['rand']         = np.random.RandomState(args.s)
-    specs['hitsfile']     = args.hitsfile
-    specs['thermal_rate'] = args.thermal_rate
-    specs['radio_rate']   = args.rate
-    specs['mu']           = args.mu
-    specs['eta']          = args.eta
-    specs['sigma']        = args.sigma
-    
-    add_noise(doms, specs)
+def add_noise(
+    event,
+    detector_info,
+    cor_rate = 250,
+    uncor_rate = 20
+):
+    times = event.total.t
+    # Patch for -1 bug
+    times = times[times > 0]
+    if len(times) > 0:
+        delta_t = np.max(times) - np.min(times)
+        noisy_event = event[[f for f in event.fields if f!="total"]]
+        d = dict(
+            sensor_pos_x = [],
+            sensor_pos_y = [],
+            sensor_pos_z = [],
+            string_id = [],
+            sensor_id = [],
+            t = [],
+        )
+        ts = [
+            np.append(
+                noise_box.correlated_noise(cor_rate, delta_t),
+                noise_box.uncorrelated_noise(uncor_rate, delta_t)
+            ) for _ in detector_info
+        ]
+        for _, (info, t_) in enumerate(zip(detector_info, ts)):
+            for tprime in t_:
+                d["sensor_pos_x"].append(info[0])
+                d["sensor_pos_y"].append(info[1])
+                d["sensor_pos_z"].append(info[2])
+                d["string_id"].append(info[3])
+                d["sensor_id"].append(info[4])
+                d["t"].append(tprime)
+        noise = ak.Array(d)
+        noisy_event = ak.with_field(noisy_event, noise, where="noise")
+        total = construct_total_dict(noisy_event)
+        noisy_event = ak.with_field(noisy_event, ak.Array(total), where="total")
+    else:
+        noisy_event = event
+    return noisy_event
