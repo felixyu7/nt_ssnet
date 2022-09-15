@@ -1,7 +1,7 @@
 import numpy as np
-import noise_box
 import awkward as ak
 
+from noise_box import uncorrelated_noise, correlated_noise
 
 def construct_total_dict(event):
 
@@ -24,36 +24,22 @@ def construct_total_dict(event):
             raise ValueError("Particle keys are not compatible.")
     
     d = {}
-    for field_k in fields:
-        #nevents = len(fill_dict[particle_fields[0]][field_k])
-
-        # Make an empty array that we will start stacking on
+    for field in fields:
         total = np.array([])
-        #total = np.array(
-        #    [np.array([]) for _ in range(nevents)]
-        #)
-        # Iterate over all the particles, stacking on total each time
         for i, k in enumerate(particle_fields):
             # Don't need to do any special handling
-            if i==0:
-                current = getattr(getattr(event, k), field_k)
-            # If this isn't the first one, we need to filter out [-1] entries
-            # so that they don't crop up in the middle
+            if np.all(getattr(getattr(event, k), field) == -1):
+                current = np.array([])
             else:
-                #current = [
-                #    x if np.all(x!=-1) else [] for x in getattr(getattr(event, k), field_k)
-                #]
-                if np.all(getattr(getattr(event, k), field_k) == -1):
-                    current = np.array([])
-                else:
-                    getattr(getattr(event, k), field_k)
+                current = getattr(getattr(event, k), field)
             # Add the new stuff to the running total
-            total = ak.concatenate(
+            total = np.hstack(
                 (total, current),
-                #axis=1
             )
+            if len(total)==0:
+                total = np.array([-1])
         # Throw it all in the dictionary :-)
-        d[field_k] = total
+        d[field] = total
     return d
 
 def add_noise(
@@ -66,34 +52,32 @@ def add_noise(
     # Patch for -1 bug
     times = times[times > 0]
     if len(times) > 0:
+        fields = event.total.fields
         delta_t = np.max(times) - np.min(times)
         noisy_event = event[[f for f in event.fields if f!="total"]]
-        d = dict(
-            sensor_pos_x = [],
-            sensor_pos_y = [],
-            sensor_pos_z = [],
-            string_id = [],
-            sensor_id = [],
-            t = [],
-        )
+        noise = {f:[] for f in fields}
+        # TODO This is so jank, we need to fix this properly
+        if "string_id" in noise.keys():
+            string_id_key = "string_id"
+        else:
+            string_id_key= "sensor_string_id"
         ts = [
             np.append(
-                noise_box.correlated_noise(cor_rate, delta_t),
-                noise_box.uncorrelated_noise(uncor_rate, delta_t)
+                correlated_noise(cor_rate, delta_t),
+                uncorrelated_noise(uncor_rate, delta_t)
             ) for _ in detector_info
         ]
         for _, (info, t_) in enumerate(zip(detector_info, ts)):
             for tprime in t_:
-                d["sensor_pos_x"].append(info[0])
-                d["sensor_pos_y"].append(info[1])
-                d["sensor_pos_z"].append(info[2])
-                d["string_id"].append(info[3])
-                d["sensor_id"].append(info[4])
-                d["t"].append(tprime)
-        noise = ak.Array(d)
+                noise["sensor_pos_x"].append(info[0])
+                noise["sensor_pos_y"].append(info[1])
+                noise["sensor_pos_z"].append(info[2])
+                noise[string_id_key].append(info[3])
+                noise["sensor_id"].append(info[4])
+                noise["t"].append(tprime)
         noisy_event = ak.with_field(noisy_event, noise, where="noise")
         total = construct_total_dict(noisy_event)
-        noisy_event = ak.with_field(noisy_event, ak.Array(total), where="total")
+        noisy_event = ak.with_field(noisy_event, total, where="total")
     else:
         noisy_event = event
     return noisy_event

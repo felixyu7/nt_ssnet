@@ -36,6 +36,5 @@ def correlated_noise(rate, delta_t, mu=-6, sigma=2.7, eta=8., rand=None):
         n_photons = rand.poisson(eta)
         zz = rand.normal(size=n_photons)
         dtt = np.power(10., mu + sigma * zz)
-        print(dtt)
         photon_ts = np.append(photon_ts, time+np.cumsum(dtt))
     return photon_ts
