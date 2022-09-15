@@ -24,6 +24,7 @@ def SMT(
         sensor_id_split,
         t_split
     ):
+        passed = False
         # Sort since HLCs only happen in one direction
         t_sorter = np.argsort(b)
         a, b = a[t_sorter], b[t_sorter]
@@ -43,9 +44,13 @@ def SMT(
                 len(hlc_times) >= multiplicity and \
                 np.max(hlc_times) - np.min(hlc_times) < time_window
             ):
-                return True
+                passed = True
+                break
     # TODO do the complicated thing but I don't think it's necessary
-    return False
+    if return_trange:
+        return passed, np.min(hlc_times), np.min(hlc_times) + time_window
+    else:
+        return passed
 
 def consecutive(data, stepsize=0, return_splitter=False):
     splitter = np.where(np.diff(data) != stepsize)[0]+1
@@ -59,6 +64,7 @@ def passed_SMT(
     multiplicity = 8,
     hlc_dt = 1000,
     time_window = 5000
+    return_trange = True
 ):
 
     if event.primary_lepton_1.t[0]==-1 and  event.primary_hadron_1.t[0]==-1:
@@ -84,11 +90,14 @@ def passed_SMT(
             event.primary_lepton_1.t,
             event.primary_hadron_1.t
         )
-    return SMT(
+
+     return SMT(
         str_id,
         sensor_id,
         t,
         multiplicity = multiplicity,
         hlc_dt = hlc_dt,
-        time_window = time_window
+        time_window = time_window,
+        return_trange = return_trange
     )
+
