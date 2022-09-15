@@ -1,7 +1,7 @@
 import numpy as np
 import awkward as ak
 
-from noise_box import uncorrelated_noise, correlated_noise
+from .noise_box import uncorrelated_noise, correlated_noise
 
 def construct_total_dict(event):
 
