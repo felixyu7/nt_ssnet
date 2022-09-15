@@ -6,7 +6,8 @@ def SMT(
     t,
     multiplicity = 8,
     hlc_dt = 1000,
-    time_window = 5e3
+    time_window = 5e3,
+    return_trange = False
 ):
     str_sorter = np.argsort(str_id)
     # sort the hits by which string they on since only
@@ -63,35 +64,45 @@ def passed_SMT(
     event,
     multiplicity = 8,
     hlc_dt = 1000,
-    time_window = 5000
-    return_trange = True
+    time_window = 5000,
+    return_trange = False
 ):
-
-    if event.primary_lepton_1.t[0]==-1 and  event.primary_hadron_1.t[0]==-1:
-        return False
-    elif event.primary_lepton_1.t[0]==-1:
-        str_id = event.primary_hadron_1.string_id
-        sensor_id = event.primary_hadron_1.sensor_id
-        t = event.primary_hadron_1.t
-    elif event.primary_hadron_1.t[0]==-1:
-        str_id = event.primary_lepton_1.string_id
-        sensor_id = event.primary_lepton_1.sensor_id
-        t = event.primary_lepton_1.t
+    #if "string_id" in event.primary_hadron_1
+    #if event.primary_lepton_1.t[0]==-1 and  event.primary_hadron_1.t[0]==-1:
+    #    return False
+    #elif event.primary_lepton_1.t[0]==-1:
+    #    str_id = event.primary_hadron_1.string_id
+    #    sensor_id = event.primary_hadron_1.sensor_id
+    #    t = event.primary_hadron_1.t
+    #elif event.primary_hadron_1.t[0]==-1:
+    #    str_id = event.primary_lepton_1.string_id
+    #    sensor_id = event.primary_lepton_1.sensor_id
+    #    t = event.primary_lepton_1.t
+    #else:
+    #    str_id = np.hstack(
+    #        event.primary_lepton_1.string_id,
+    #        event.primary_hadron_1.string_id
+    #    )
+    #    sensor_id = np.hstack(
+    #        event.primary_lepton_1.sensor_id,
+    #        event.primary_hadron_1.sensor_id
+    #    )
+    #    t = np.hstack(
+    #        event.primary_lepton_1.t,
+    #        event.primary_hadron_1.t
+    #    )
+    if "string_id" in event.total.fields:
+        str_id = np.array(
+            [x for x in event.total.string_id if x != -1]
+        )
     else:
-        str_id = np.hstack(
-            event.primary_lepton_1.string_id,
-            event.primary_hadron_1.string_id
+        str_id = np.array(
+            [x for x in event.total.sensor_string_id if x != -1]
         )
-        sensor_id = np.hstack(
-            event.primary_lepton_1.sensor_id,
-            event.primary_hadron_1.sensor_id
-        )
-        t = np.hstack(
-            event.primary_lepton_1.t,
-            event.primary_hadron_1.t
-        )
+    t = np.array([x for x in event.total.t if x != -1])
+    sensor_id = np.array([x for x in event.total.sensor_id if x != -1])
 
-     return SMT(
+    return SMT(
         str_id,
         sensor_id,
         t,
