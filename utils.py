@@ -38,6 +38,10 @@ def LogCoshLoss(pred, truth):
     x = pred - truth
     return (x + torch.nn.functional.softplus(-2.0 * x) - np.log(2.0)).mean()
 
-def CosineAngleLoss(pred, truth):
-    x = torch.mean(torch.abs(F.cosine_similarity(truth, pred)))
+def CosineSimilarityLoss(pred, truth):
+    x = F.cosine_similarity(pred, truth).mean()
     return 1. - x
+
+def AngularDistanceLoss(pred, truth, eps=1e-7):
+    x = torch.acos(torch.clamp(F.cosine_similarity(pred, truth), min=-1.+eps, max=1.-eps)) / np.pi
+    return x.mean()

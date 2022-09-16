@@ -22,6 +22,7 @@ class SparseIceCubeNet(nn.Module):
             ME.MinkowskiBatchNorm(16),
             ME.MinkowskiReLU(inplace=True),
             ME.MinkowskiMaxPooling(kernel_size=8, stride=8, dimension=4),
+            ME.MinkowskiDropout(0.5)
             )
 
         self.conv2 = nn.Sequential(
@@ -31,6 +32,7 @@ class SparseIceCubeNet(nn.Module):
             ME.MinkowskiBatchNorm(16),
             ME.MinkowskiReLU(inplace=True),
             ME.MinkowskiMaxPooling(kernel_size=2, stride=2, dimension=4),
+            ME.MinkowskiDropout(0.3)
             )
         
         self.conv3 = nn.Sequential(
@@ -40,6 +42,7 @@ class SparseIceCubeNet(nn.Module):
             ME.MinkowskiBatchNorm(32),
             ME.MinkowskiReLU(inplace=True),
             ME.MinkowskiMaxPooling(kernel_size=2, stride=2, dimension=4),
+            ME.MinkowskiDropout(0.3)
             )
         
         self.conv4 = nn.Sequential(
@@ -49,6 +52,7 @@ class SparseIceCubeNet(nn.Module):
             ME.MinkowskiBatchNorm(32),
             ME.MinkowskiReLU(inplace=True),
             ME.MinkowskiMaxPooling(kernel_size=2, stride=2, dimension=4),
+            ME.MinkowskiDropout(0.3)
             )
         
         self.conv5 = nn.Sequential(
@@ -58,6 +62,7 @@ class SparseIceCubeNet(nn.Module):
             ME.MinkowskiBatchNorm(32),
             ME.MinkowskiReLU(inplace=True),
             ME.MinkowskiMaxPooling(kernel_size=2, stride=2, dimension=4),
+            ME.MinkowskiDropout(0.3)
             )
         
         self.conv6 = nn.Sequential(
@@ -67,6 +72,7 @@ class SparseIceCubeNet(nn.Module):
             ME.MinkowskiBatchNorm(64),
             ME.MinkowskiReLU(inplace=True),
             ME.MinkowskiMaxPooling(kernel_size=2, stride=2, dimension=4),
+            ME.MinkowskiDropout(0.1)
             )
         
         self.conv7 = nn.Sequential(
@@ -76,6 +82,7 @@ class SparseIceCubeNet(nn.Module):
             ME.MinkowskiBatchNorm(64),
             ME.MinkowskiReLU(inplace=True),
             ME.MinkowskiMaxPooling(kernel_size=2, stride=2, dimension=4),
+            ME.MinkowskiDropout(0.1)
             )
         
         self.conv8 = nn.Sequential(
@@ -84,6 +91,7 @@ class SparseIceCubeNet(nn.Module):
             ),
             ME.MinkowskiBatchNorm(64),
             ME.MinkowskiReLU(inplace=True),
+            ME.MinkowskiDropout(0.1)
             )
         
         self.glob_maxpool = ME.MinkowskiGlobalMaxPooling()

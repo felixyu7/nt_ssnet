@@ -14,7 +14,7 @@ import os
 from ic_ssnet import SparseIceCubeNet
 from ic_dataset import SparseIceCubeDataset
 from ic_dataset import ic_data_prep
-from utils import LogCoshLoss, ic_collate_fn, angle_between
+from utils import LogCoshLoss, ic_collate_fn, CosineSimilarityLoss, AngularDistanceLoss
 
 import yaml
 import csv
@@ -32,8 +32,9 @@ if cfg['pred_cartesian_direction']:
 else:
     net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
 
-train_dataset = SparseIceCubeDataset(t_photons_data, t_nu_data, cfg['pred_cartesian_direction'])
-valid_dataset = SparseIceCubeDataset(v_photons_data, v_nu_data, cfg['pred_cartesian_direction'])
+train_dataset = SparseIceCubeDataset(t_photons_data[10000:], t_nu_data[10000:], cfg['pred_cartesian_direction'], cfg['first_hit'])
+# valid_dataset = SparseIceCubeDataset(t_photons_data[:10000], t_nu_data[:10000], cfg['pred_cartesian_direction'])
+valid_dataset = SparseIceCubeDataset(v_photons_data, v_nu_data, cfg['pred_cartesian_direction'], cfg['first_hit'])
 
 train_dataloader = torch.utils.data.DataLoader(train_dataset, 
                                          batch_size = cfg['batch_size'], 
@@ -48,9 +49,11 @@ valid_dataloader = torch.utils.data.DataLoader(valid_dataset,
                                          num_workers=len(os.sched_getaffinity(0)),
                                          pin_memory=True)
 
+print(len(train_dataset))
 
 optimizer = torch.optim.Adam(net.parameters(), lr=cfg['lr'], weight_decay=1e-5)
-criterion = LogCoshLoss
+criterion = AngularDistanceLoss
+e_criterion = LogCoshLoss
 
 tot_iter = 0
 tot_time = 0
@@ -96,10 +99,14 @@ for epoch in range(epoch_start, cfg['epochs']):
         
         labels = labels[:,1:].reshape(-1, 3).float().to(torch.device(cfg['device']))
         preds = out.F
+        # angular_loss = criterion(preds[:,1:], labels[:,1:])
+        # energy_loss = e_criterion(preds[:,0], labels[:,0])
         loss = criterion(preds, labels)
 
+        # print("Angular Loss:", angular_loss)
+        # print("Energy Loss:", energy_loss)
+
         loss.backward()
-        nn.utils.clip_grad_norm_(net.parameters(), 5.)
         optimizer.step()
 
         with open(cfg['logs_file'], 'a+') as logs_file:
@@ -116,24 +123,24 @@ for epoch in range(epoch_start, cfg['epochs']):
             )
             accum_loss, accum_iter = 0, 0
             
-        # if tot_iter % 1000 == 0:
-        #     with torch.no_grad():
-        #         valid_iter = iter(valid_dataloader)
-        #         net.eval()
-        #         valid_loss = 0
-        #         valid_iters = 0
-        #         for i, vdata in enumerate(valid_iter):
-        #             vcoords, vfeats, vlabels = vdata
-        #             vinputs = ME.SparseTensor(vfeats.float().reshape(vcoords.shape[0], -1), vcoords, 
-        #                    device=torch.device(cfg['device']), requires_grad=True)
+        if tot_iter % 100 == 0:
+            with torch.no_grad():
+                valid_iter = iter(valid_dataloader)
+                net.eval()
+                valid_loss = 0
+                valid_iters = 0
+                for i, vdata in enumerate(valid_iter):
+                    vcoords, vfeats, vlabels = vdata
+                    vinputs = ME.SparseTensor(vfeats.float().reshape(vcoords.shape[0], -1), vcoords, 
+                           device=torch.device(cfg['device']), requires_grad=True)
 
-        #             vout, inds = net(vinputs)
-        #             vlabels = vlabels[:,0].reshape(-1, 1).float().to(torch.device(cfg['device']))
-        #             vpreds = vout.F
-        #             valid_loss += criterion(vpreds, vlabels)
-        #             valid_iters += 1
-        #         print("validation loss: ", valid_loss / valid_iters)
-        #     net.train()
+                    vout, inds = net(vinputs)
+                    vlabels = vlabels[:,1:].reshape(-1, 3).float().to(torch.device(cfg['device']))
+                    vpreds = vout.F
+                    valid_loss += criterion(vpreds, vlabels)
+                    valid_iters += 1
+                print("validation loss: ", valid_loss / valid_iters)
+            net.train()
 
     torch.save({
                 'model_state_dict': net.state_dict(),

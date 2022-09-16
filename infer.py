@@ -25,10 +25,10 @@ photons_data, nu_data = ic_data_prep(cfg['data_file'])
 # initialize network
 if cfg['pred_cartesian_direction']:
     net = SparseIceCubeNet(1, 3, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
-else:
+else: 
     net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))    
 
-test_dataset = SparseIceCubeDataset(photons_data[:16383], nu_data[:16383], cfg['pred_cartesian_direction'])
+test_dataset = SparseIceCubeDataset(photons_data[:10000], nu_data[:10000], cfg['pred_cartesian_direction'], cfg['first_hit'])
 test_dataloader = torch.utils.data.DataLoader(test_dataset, 
                                          batch_size = cfg['batch_size'], 
                                          shuffle=False,
@@ -51,6 +51,7 @@ else:
 
 import time
 times = []
+num_hits = []
 
 # for i in range(1000):
 #     time_get_item = time.time()
@@ -77,6 +78,7 @@ for epoch in range(1):
             start = time.time()
             out, inds = net(inputs)
             times.append(time.time() - start)
+            num_hits.append(coords.shape[0])
             pred = out.F[inds]
             preds = np.vstack((preds, pred.cpu().numpy()))
             truth = np.vstack((truth, labels[:,1:].cpu().numpy()))
@@ -88,11 +90,13 @@ print(total_time / len(test_dataset))
 
 angle_diff = []
 for i in range(preds.shape[0]):
-    angle_diff.append(angle_between(preds[i], truth[i]))
+    angle_diff.append(angle_between(preds[i][1:], truth[i][1:]))
 
-import pdb; pdb.set_trace()
+print(np.array(angle_diff).mean())
 
 import matplotlib.pyplot as plt
+
+preds = preds / np.linalg.norm(preds, axis=1).reshape(-1, 1)
 
 # cos_zenith_pred = np.cos(preds)
 # cos_zenith_truth = np.cos(truth)
@@ -108,3 +112,5 @@ plt.savefig("./result.png")
 
 print(np.sqrt(np.mean(diff**2)))
 print(np.median(diff))
+
+# import pdb; pdb.set_trace()
