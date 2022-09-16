@@ -5,8 +5,9 @@ def SMT(
     sensor_id,
     t,
     multiplicity = 8,
-    hlc_dt = 1000,
-    time_window = 5e3,
+    hlc_dt = 5000,
+    time_window_back = 4e3,
+    time_window_forward = 6e3,
     return_trange = False
 ):
     str_sorter = np.argsort(str_id)
@@ -43,13 +44,12 @@ def SMT(
             hlc_times = np.append(hlc_times, b[slc][is_hlc])
             if (
                 len(hlc_times) >= multiplicity and \
-                np.max(hlc_times) - np.min(hlc_times) < time_window
+                np.max(hlc_times) - np.min(hlc_times) < hlc_dt
             ):
                 passed = True
-                break
     # TODO do the complicated thing but I don't think it's necessary
     if return_trange:
-        return passed, np.min(hlc_times), np.min(hlc_times) + time_window
+        return passed, np.min(hlc_times)-time_window_back, np.max(hlc_times) + time_window_forward
     else:
         return passed
 
@@ -63,34 +63,11 @@ def consecutive(data, stepsize=0, return_splitter=False):
 def passed_SMT(
     event,
     multiplicity = 8,
-    hlc_dt = 1000,
-    time_window = 5000,
+    hlc_dt = 5000,
+    time_window_forward = 6000,
+    time_window_back = 4000,
     return_trange = False
 ):
-    #if "string_id" in event.primary_hadron_1
-    #if event.primary_lepton_1.t[0]==-1 and  event.primary_hadron_1.t[0]==-1:
-    #    return False
-    #elif event.primary_lepton_1.t[0]==-1:
-    #    str_id = event.primary_hadron_1.string_id
-    #    sensor_id = event.primary_hadron_1.sensor_id
-    #    t = event.primary_hadron_1.t
-    #elif event.primary_hadron_1.t[0]==-1:
-    #    str_id = event.primary_lepton_1.string_id
-    #    sensor_id = event.primary_lepton_1.sensor_id
-    #    t = event.primary_lepton_1.t
-    #else:
-    #    str_id = np.hstack(
-    #        event.primary_lepton_1.string_id,
-    #        event.primary_hadron_1.string_id
-    #    )
-    #    sensor_id = np.hstack(
-    #        event.primary_lepton_1.sensor_id,
-    #        event.primary_hadron_1.sensor_id
-    #    )
-    #    t = np.hstack(
-    #        event.primary_lepton_1.t,
-    #        event.primary_hadron_1.t
-    #    )
     if "string_id" in event.total.fields:
         str_id = np.array(
             [x for x in event.total.string_id if x != -1]
@@ -108,7 +85,8 @@ def passed_SMT(
         t,
         multiplicity = multiplicity,
         hlc_dt = hlc_dt,
-        time_window = time_window,
+        time_window_back = time_window_back,
+        time_window_forward = time_window_forward,
         return_trange = return_trange
     )
 
