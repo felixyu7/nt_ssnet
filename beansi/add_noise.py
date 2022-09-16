@@ -74,7 +74,7 @@ def add_noise(
                 noise["sensor_pos_z"].append(info[2])
                 noise[string_id_key].append(info[3])
                 noise["sensor_id"].append(info[4])
-                noise["t"].append(tprime)
+                noise["t"].append(tprime + np.min(times))
         noisy_event = ak.with_field(noisy_event, noise, where="noise")
         total = construct_total_dict(noisy_event)
         noisy_event = ak.with_field(noisy_event, total, where="total")
