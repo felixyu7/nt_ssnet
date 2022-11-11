@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import random_split
 import numpy as np
 import MinkowskiEngine as ME
 
@@ -11,13 +12,16 @@ import glob
 import re
 import os
 
-from ic_ssnet import SparseIceCubeNet
+from ic_ssnet import SparseIceCubeNet, SparseIceCubeVGG16
+from resnet_block import SparseIceCubeResNet
 from ic_dataset import SparseIceCubeDataset
 from ic_dataset import ic_data_prep
-from utils import LogCoshLoss, ic_collate_fn, CosineSimilarityLoss, AngularDistanceLoss
+from utils import LogCoshLoss, ic_collate_fn, CosineSimilarityLoss, AngularDistanceLoss, AngularDistanceLossV2, TukeyAngularDistanceLoss
 
 import yaml
 import csv
+
+from resnet_block import ResNetBlock
 
 with open("train.cfg", 'r') as cfg_file:
     cfg = yaml.load(cfg_file, Loader=yaml.FullLoader)
@@ -26,32 +30,41 @@ with open("train.cfg", 'r') as cfg_file:
 t_photons_data, t_nu_data = ic_data_prep(cfg['train_data_file'])
 v_photons_data, v_nu_data = ic_data_prep(cfg['valid_data_file'])
 
-# initialize network
-if cfg['pred_cartesian_direction']:
-    net = SparseIceCubeNet(1, 3, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
-else:
-    net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
+event_list = np.loadtxt('./cuts_v4.txt').astype(np.int32)
+t_photons_data = t_photons_data[event_list]
+t_nu_data = t_nu_data[event_list]
 
-train_dataset = SparseIceCubeDataset(t_photons_data[10000:], t_nu_data[10000:], cfg['pred_cartesian_direction'], cfg['first_hit'])
-# valid_dataset = SparseIceCubeDataset(t_photons_data[:10000], t_nu_data[:10000], cfg['pred_cartesian_direction'])
-valid_dataset = SparseIceCubeDataset(v_photons_data, v_nu_data, cfg['pred_cartesian_direction'], cfg['first_hit'])
+# initialize network
+# if cfg['pred_cartesian_direction']:
+#     net = SparseIceCubeNet(1, 3, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
+# else:
+#     net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
+
+net = SparseIceCubeResNet(1, 3, reps=1, depth=12, first_num_filters=16, dropout=0., D=4).to(torch.device(cfg['device']))
+
+print("num params: ", sum(p.numel() for p in net.parameters() if p.requires_grad))
+
+dataset = SparseIceCubeDataset(t_photons_data, t_nu_data, cfg['pred_cartesian_direction'], cfg['first_hit'])
+train_dataset, valid_dataset = random_split(dataset, [len(dataset) - 5000, 5000], generator=torch.Generator().manual_seed(42))
+# valid_dataset = SparseIceCubeDataset(t_photons_data[:5000], t_nu_data[:5000], cfg['pred_cartesian_direction'], cfg['first_hit'])
+# valid_dataset = SparseIceCubeDataset(v_photons_data, v_nu_data, cfg['pred_cartesian_direction'], cfg['first_hit'])
 
 train_dataloader = torch.utils.data.DataLoader(train_dataset, 
-                                         batch_size = cfg['batch_size'], 
-                                         shuffle=True,
-                                         collate_fn=ic_collate_fn,
-                                         num_workers=len(os.sched_getaffinity(0)),
-                                         pin_memory=True)
+                                        batch_size = cfg['batch_size'], 
+                                        shuffle=True,
+                                        collate_fn=ic_collate_fn,
+                                        num_workers=len(os.sched_getaffinity(0)),
+                                        pin_memory=True)
 valid_dataloader = torch.utils.data.DataLoader(valid_dataset, 
-                                         batch_size = cfg['batch_size'], 
-                                         shuffle=False,
-                                         collate_fn=ic_collate_fn,
-                                         num_workers=len(os.sched_getaffinity(0)),
-                                         pin_memory=True)
+                                        batch_size = cfg['batch_size'], 
+                                        shuffle=False,
+                                        collate_fn=ic_collate_fn,
+                                        num_workers=len(os.sched_getaffinity(0)),
+                                        pin_memory=True)
 
 print(len(train_dataset))
-
-optimizer = torch.optim.Adam(net.parameters(), lr=cfg['lr'], weight_decay=1e-5)
+optimizer = torch.optim.AdamW(net.parameters(), lr=cfg['lr'])
+# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=1e-2)
 criterion = AngularDistanceLoss
 e_criterion = LogCoshLoss
 
@@ -88,23 +101,21 @@ for epoch in range(epoch_start, cfg['epochs']):
     # Training
     net.train()
     for i, data in enumerate(train_iter):
+
         coords, feats, labels = data
         
         inputs = ME.SparseTensor(feats.float().reshape(coords.shape[0], -1), coords, device=torch.device(cfg['device']),
-                                 minkowski_algorithm=algorithm, requires_grad=True)
+                                minkowski_algorithm=algorithm, requires_grad=True)
         
 
         out, inds = net(inputs)
         optimizer.zero_grad()
-        
-        labels = labels[:,1:].reshape(-1, 3).float().to(torch.device(cfg['device']))
-        preds = out.F
-        # angular_loss = criterion(preds[:,1:], labels[:,1:])
-        # energy_loss = e_criterion(preds[:,0], labels[:,0])
-        loss = criterion(preds, labels)
 
-        # print("Angular Loss:", angular_loss)
-        # print("Energy Loss:", energy_loss)
+        labels = labels[:,1:].reshape(-1, 3).float().to(torch.device(cfg['device']))
+
+        preds = out.F
+
+        loss = criterion(preds, labels)
 
         loss.backward()
         optimizer.step()
@@ -117,13 +128,13 @@ for epoch in range(epoch_start, cfg['epochs']):
         accum_iter += 1
         tot_iter += 1
 
-        if tot_iter % 1 == 0 or tot_iter == 1:
+        if tot_iter % 100 == 0 or tot_iter == 1:
             print(
                 f'Iter: {tot_iter}, Epoch: {epoch}, Loss: {accum_loss / accum_iter}'
             )
             accum_loss, accum_iter = 0, 0
             
-        if tot_iter % 100 == 0:
+        if tot_iter % 500 == 0:
             with torch.no_grad():
                 valid_iter = iter(valid_dataloader)
                 net.eval()
@@ -132,19 +143,22 @@ for epoch in range(epoch_start, cfg['epochs']):
                 for i, vdata in enumerate(valid_iter):
                     vcoords, vfeats, vlabels = vdata
                     vinputs = ME.SparseTensor(vfeats.float().reshape(vcoords.shape[0], -1), vcoords, 
-                           device=torch.device(cfg['device']), requires_grad=True)
+                        device=torch.device(cfg['device']), requires_grad=True)
 
                     vout, inds = net(vinputs)
                     vlabels = vlabels[:,1:].reshape(-1, 3).float().to(torch.device(cfg['device']))
                     vpreds = vout.F
                     valid_loss += criterion(vpreds, vlabels)
                     valid_iters += 1
-                print("validation loss: ", valid_loss / valid_iters)
+                valid_loss = valid_loss / valid_iters
+                print("validation loss: ", valid_loss)
+            # scheduler.step(valid_loss)
             net.train()
 
-    torch.save({
-                'model_state_dict': net.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'epoch': epoch,
-                'global_step': tot_iter,
-                }, cfg['ckpt_dir'] + 'epoch_' + str(epoch) + '.ckpt')
+    if (epoch + 1) % 5 == 0:
+        torch.save({
+                    'model_state_dict': net.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'epoch': epoch,
+                    'global_step': tot_iter,
+                    }, cfg['ckpt_dir'] + 'epoch_' + str(epoch) + '.ckpt')

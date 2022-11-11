@@ -1,14 +1,18 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import random_split
 import numpy as np
 import matplotlib.pyplot as plt
+plt.style.use('./paper.mplstyle')
 import MinkowskiEngine as ME
+
+from resnet_block import SparseIceCubeResNet
 
 from ic_ssnet import SparseIceCubeNet
 from ic_dataset import SparseIceCubeDataset
 from ic_dataset import ic_data_prep
-from utils import angle_between, ic_collate_fn
+from utils import angle_between, ic_collate_fn, get_p_of_bins, make_double_plot, get_mean_of_bins
 
 import yaml
 import glob
@@ -22,13 +26,21 @@ with open("inference.cfg", 'r') as cfg_file:
 # data_files = sorted(glob.glob(cfg['data_dir'] + ("*.parquet")))
 photons_data, nu_data = ic_data_prep(cfg['data_file'])
 
-# initialize network
-if cfg['pred_cartesian_direction']:
-    net = SparseIceCubeNet(1, 3, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
-else: 
-    net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))    
+event_list = np.loadtxt('./cuts_v4.txt').astype(np.int32)
+photons_data = photons_data[event_list]
+nu_data = nu_data[event_list]
 
-test_dataset = SparseIceCubeDataset(photons_data[:10000], nu_data[:10000], cfg['pred_cartesian_direction'], cfg['first_hit'])
+# initialize network
+# if cfg['pred_cartesian_direction']:
+#     net = SparseIceCubeNet(1, 3, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
+# else: 
+#     net = SparseIceCubeNet(1, 1, expand=cfg['expand'], D=4).to(torch.device(cfg['device']))
+
+net = SparseIceCubeResNet(1, 3, reps=1, depth=12, first_num_filters=16, D=4).to(torch.device(cfg['device']))
+
+dataset = SparseIceCubeDataset(photons_data, nu_data, cfg['pred_cartesian_direction'], cfg['first_hit'])
+# test_dataset = dataset
+train_dataset, test_dataset = random_split(dataset, [len(dataset) - 5000, 5000], generator=torch.Generator().manual_seed(42))
 test_dataloader = torch.utils.data.DataLoader(test_dataset, 
                                          batch_size = cfg['batch_size'], 
                                          shuffle=False,
@@ -60,7 +72,6 @@ num_hits = []
 
 # import pdb; pdb.set_trace()
 
-
 for epoch in range(1):
     test_iter = iter(test_dataloader)
 
@@ -90,10 +101,10 @@ print(total_time / len(test_dataset))
 
 angle_diff = []
 for i in range(preds.shape[0]):
-    angle_diff.append(angle_between(preds[i][1:], truth[i][1:]))
+    angle_diff.append(angle_between(preds[i], truth[i]))
 
 print(np.array(angle_diff).mean())
-
+angle_diff = np.array(angle_diff)
 import matplotlib.pyplot as plt
 
 preds = preds / np.linalg.norm(preds, axis=1).reshape(-1, 1)
@@ -113,4 +124,4 @@ plt.savefig("./result.png")
 print(np.sqrt(np.mean(diff**2)))
 print(np.median(diff))
 
-# import pdb; pdb.set_trace()
+import pdb; pdb.set_trace()

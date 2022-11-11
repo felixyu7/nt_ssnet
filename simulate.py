@@ -81,7 +81,7 @@ def initialize_args():
         "--force_volume",
         dest="force_volume",
         action="store_true",
-        default=False,
+        default=True,
         help="Force volume injection."
     )
     # I/O
@@ -135,17 +135,16 @@ def main(args):
     else:
         raise ValueError("What's happening here")
     config["detector"]["detector specs file"] = args.geo_file
-    config["detector"]["file name"] = "/n/home10/felixyu/hebe/hebe/data/icecube-f2k"
     config["detector"]["padding"] = args.padding
     config["general"]["random state seed"] = seed
     config["general"]["config location"] = f"{args.output_prefix}/config_{args.final_1}_{args.final_2}_seed_{seed}.json"
     config["general"]["meta_name"] = 'meta_data_%d' % seed
-    if clepton in ranged_leptons:
-        config['run']['group name'] = 'RangedInjector0'
-        config['lepton injector']['simulation']['is ranged'] = True
-    else:
-        config['run']['group name'] = 'VolumeInjector0'
-        config['lepton injector']['simulation']['is ranged'] = False
+    # if clepton in ranged_leptons:
+    #     config['run']['group name'] = 'RangedInjector0'
+    #     config['lepton injector']['simulation']['is ranged'] = True
+    # else:
+    config['run']['group name'] = 'VolumeInjector0'
+    config['lepton injector']['simulation']['is ranged'] = False
     config['lepton injector']['simulation']['output name'] = f"{args.output_prefix}/config_{args.final_1}_{args.final_2}_seed_{seed}.h5"
     config['lepton injector']['simulation']['nevents'] = nevent
     config['lepton injector']['simulation']['final state 1'] = args.final_1
