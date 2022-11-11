@@ -47,6 +47,10 @@ def SMT(
                 np.max(hlc_times) - np.min(hlc_times) < hlc_dt
             ):
                 passed = True
+                if return_trange:
+                    return passed, np.min(hlc_times)-time_window_back, np.max(hlc_times) + time_window_forward
+                else:
+                    return passed
     # TODO do the complicated thing but I don't think it's necessary
     if return_trange:
         return passed, np.min(hlc_times)-time_window_back, np.max(hlc_times) + time_window_forward
@@ -89,4 +93,3 @@ def passed_SMT(
         time_window_forward = time_window_forward,
         return_trange = return_trange
     )
-
