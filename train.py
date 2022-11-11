@@ -12,8 +12,7 @@ import glob
 import re
 import os
 
-from ic_ssnet import SparseIceCubeNet, SparseIceCubeVGG16
-from resnet_block import SparseIceCubeResNet
+from ic_ssnet import SparseIceCubeNet, SparseIceCubeResNet
 from ic_dataset import SparseIceCubeDataset
 from ic_dataset import ic_data_prep
 from utils import LogCoshLoss, ic_collate_fn, CosineSimilarityLoss, AngularDistanceLoss, AngularDistanceLossV2, TukeyAngularDistanceLoss
