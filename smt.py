@@ -110,20 +110,24 @@ def SMT(
     
 
 def passed_SMT(
-    event,
+    event: ak.Record,
     multiplicity: int = 8,
-    hlc_dt:float = 5000.0,
-):
-    if "string_id" in event.total.fields:
+    hlc_dt: float = 5000.0,
+    field: str = "total"
+) -> (bool, float, float):
+
+    # sorry bout it
+    whatever = getattr(event, field)
+    if "string_id" in whatever.fields:
         string_ids = np.array(
-            [x for x in event.total.string_id if x != -1]
+            [x for x in whatever.string_id if x != -1]
         )
     else:
         string_ids = np.array(
-            [x for x in event.total.sensor_string_id if x != -1]
+            [x for x in whatever.sensor_string_id if x != -1]
         )
-    times = np.array([x for x in event.total.t if x != -1])
-    sensor_ids = np.array([x for x in event.total.sensor_id if x != -1])
+    times = np.array([x for x in whatever.t if x != -1])
+    sensor_ids = np.array([x for x in whatever.sensor_id if x != -1])
 
     sorter = np.argsort(times)
     return SMT(
