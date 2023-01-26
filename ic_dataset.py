@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import MinkowskiEngine as ME
+from utils import non_scattered_hits
 
 import awkward as ak
 
@@ -17,14 +18,12 @@ class SparseIceCubeDataset(torch.utils.data.Dataset):
         self,
         photons_data,
         nu_data,
-        pred_cartesian_direction,
         first_hit,
         training=True):
 
         self.data = photons_data
         self.nu_data = nu_data
         self.dataset_size = len(self.data)
-        self.pred_cartesian_direction = pred_cartesian_direction
         self.first_hit = first_hit
         
     def __len__(self):
@@ -35,26 +34,26 @@ class SparseIceCubeDataset(torch.utils.data.Dataset):
         # [energy, zenith, azimuth]
         label = [self.nu_data[i][0], self.nu_data[i][1], self.nu_data[i][2]]
 
-        if self.data[i].primary_hadron_1.sensor_pos_x.to_numpy()[0] == -1:
-            xs = self.data[i].primary_lepton_1.sensor_pos_x.to_numpy()
-            ys = self.data[i].primary_lepton_1.sensor_pos_y.to_numpy()
-            zs = self.data[i].primary_lepton_1.sensor_pos_z.to_numpy()
-            ts = self.data[i].primary_lepton_1.t.to_numpy()
-        elif self.data[i].primary_lepton_1.sensor_pos_x.to_numpy()[0] == -1:
-            xs = self.data[i].primary_hadron_1.sensor_pos_x.to_numpy()
-            ys = self.data[i].primary_hadron_1.sensor_pos_y.to_numpy()
-            zs = self.data[i].primary_hadron_1.sensor_pos_z.to_numpy()
-            ts = self.data[i].primary_hadron_1.t.to_numpy()
-        else:    
-            xs = np.hstack((self.data[i].primary_lepton_1.sensor_pos_x.to_numpy(), self.data[i].primary_hadron_1.sensor_pos_x.to_numpy()))
-            ys = np.hstack((self.data[i].primary_lepton_1.sensor_pos_y.to_numpy(), self.data[i].primary_hadron_1.sensor_pos_y.to_numpy()))
-            zs = np.hstack((self.data[i].primary_lepton_1.sensor_pos_z.to_numpy(), self.data[i].primary_hadron_1.sensor_pos_z.to_numpy()))
-            ts = np.hstack((self.data[i].primary_lepton_1.t.to_numpy(), self.data[i].primary_hadron_1.t.to_numpy()))
+        # if self.data[i].primary_hadron_1.sensor_pos_x.to_numpy()[0] == -1:
+        #     xs = self.data[i].primary_lepton_1.sensor_pos_x.to_numpy()
+        #     ys = self.data[i].primary_lepton_1.sensor_pos_y.to_numpy()
+        #     zs = self.data[i].primary_lepton_1.sensor_pos_z.to_numpy()
+        #     ts = self.data[i].primary_lepton_1.t.to_numpy()
+        # elif self.data[i].primary_lepton_1.sensor_pos_x.to_numpy()[0] == -1:
+        #     xs = self.data[i].primary_hadron_1.sensor_pos_x.to_numpy()
+        #     ys = self.data[i].primary_hadron_1.sensor_pos_y.to_numpy()
+        #     zs = self.data[i].primary_hadron_1.sensor_pos_z.to_numpy()
+        #     ts = self.data[i].primary_hadron_1.t.to_numpy()
+        # else:    
+        #     xs = np.hstack((self.data[i].primary_lepton_1.sensor_pos_x.to_numpy(), self.data[i].primary_hadron_1.sensor_pos_x.to_numpy()))
+        #     ys = np.hstack((self.data[i].primary_lepton_1.sensor_pos_y.to_numpy(), self.data[i].primary_hadron_1.sensor_pos_y.to_numpy()))
+        #     zs = np.hstack((self.data[i].primary_lepton_1.sensor_pos_z.to_numpy(), self.data[i].primary_hadron_1.sensor_pos_z.to_numpy()))
+        #     ts = np.hstack((self.data[i].primary_lepton_1.t.to_numpy(), self.data[i].primary_hadron_1.t.to_numpy()))
 
-        xs *= 4.566
-        ys *= 4.566
-        zs *= 4.566
-        ts = ts - ts.min()
+        xs = self.data[i].filtered.sensor_pos_x.to_numpy() * 4.566
+        ys = self.data[i].filtered.sensor_pos_y.to_numpy() * 4.566
+        zs = self.data[i].filtered.sensor_pos_z.to_numpy() * 4.566
+        ts = self.data[i].filtered.t.to_numpy() - self.data[i].filtered.t.to_numpy().min()
 
         pos_t = np.array([
             xs,
@@ -71,15 +70,17 @@ class SparseIceCubeDataset(torch.utils.data.Dataset):
             pos_t = np.trunc(pos_t)
             # feats = (feats - feats.mean()) / (feats.std() + 1e-8)
         else:
+            pos_t = np.trunc(pos_t)
             pos_t, feats = np.unique(pos_t, return_counts=True, axis=0)
+            # feats = (feats - feats.mean()) / (feats.std() + 1e-8)
 
+        # feats = feats / feats.max()
         feats = feats.reshape(-1, 1).astype(np.float64)
 
-        if self.pred_cartesian_direction:
-            x = np.cos(label[2]) * np.sin(label[1])
-            y = np.sin(label[2]) * np.sin(label[1])
-            z = np.cos(label[1])
-            label = [label[0], x, y, z]
+        x = np.cos(label[2]) * np.sin(label[1])
+        y = np.sin(label[2]) * np.sin(label[1])
+        z = np.cos(label[1])
+        label = [label[0], x, y, z]
 
         return torch.from_numpy(pos_t), torch.from_numpy(feats).view(-1, 1), torch.from_numpy(np.array([label]))
 
@@ -89,7 +90,7 @@ class SparseIceCubeDataset(torch.utils.data.Dataset):
 def ic_data_prep(data_file):
     tsime = time.time()
 
-    photons_data = ak.from_parquet(data_file, columns=["mc_truth", "primary_lepton_1", "primary_hadron_1"])
+    photons_data = ak.from_parquet(data_file, columns=["mc_truth", "filtered"])
 
     print("total time:", time.time() - tsime)
 
@@ -101,6 +102,6 @@ def ic_data_prep(data_file):
     # energy transforms/normalization
     es_norm = (np.log(1 + es) - np.log(1 + es).mean()) / np.log(1 + es).std()
 
-    nu_data = np.dstack((es, zenith, azimuth)).reshape(-1, 3)
+    nu_data = np.dstack((((np.log10(es) - 4) / 2), zenith, azimuth)).reshape(-1, 3)
 
     return photons_data, nu_data

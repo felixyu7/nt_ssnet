@@ -22,6 +22,7 @@ class ResNetBlock(ME.MinkowskiNetwork):
                  kernel_size=3,
                  dimension=4,
                  dropout=0.,
+                 expand=False,
                  bias=False):
         super(ResNetBlock, self).__init__(dimension)
         assert dimension > 0
@@ -33,17 +34,17 @@ class ResNetBlock(ME.MinkowskiNetwork):
             self.residual = Identity()
         
         self.conv1 = nn.Sequential(ME.MinkowskiConvolution(
-            in_features, out_features, kernel_size=kernel_size,
+            in_features, out_features, kernel_size=kernel_size, expand_coordinates=expand,
             stride=stride, dilation=dilation, dimension=dimension, bias=bias),
             ME.MinkowskiBatchNorm(out_features),
-            ME.MinkowskiReLU(),
+            ME.MinkowskiPReLU(),
             ME.MinkowskiDropout(dropout))
 
         self.conv2 = nn.Sequential(ME.MinkowskiConvolution(
-            out_features, out_features, kernel_size=kernel_size,
+            out_features, out_features, kernel_size=kernel_size, expand_coordinates=expand,
             stride=stride, dilation=dilation, dimension=dimension, bias=bias),
             ME.MinkowskiBatchNorm(out_features),
-            ME.MinkowskiReLU(),
+            ME.MinkowskiPReLU(),
             ME.MinkowskiDropout(dropout))
         
         self.weight_initialization()
