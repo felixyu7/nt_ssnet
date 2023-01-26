@@ -1,5 +1,17 @@
 # ic_ssnet: A Sparse Submanifold CNN for IceCube
 
+This repo contains the scripts and code for the Sparse Submanifold CNN (SSCNN) project for neutrino telescope/IceCube data. The code in this repo are setup to train on and predict the direction and/or energy of the neutrino. The working environment used to implement, run and test this code are as follows:
+
+- Python 3.7.5
+- PyTorch 1.10.1
+- CUDA 11.1 (if using gpu)
+- MinkowskiEngine 0.5.4
+- Numpy 1.21.4
+- Awkward 1.8.0
+- yaml 5.4.1
+
+Training and inference runs can be configured with the files (train.cfg, inference.cfg). 
+
 ## Beansi: Noise module
 
 Beansi (Ban-shee) applies correlated and uncorrelated noise to events. The process for this is outlined in https://inspirehep.net/files/147e9132d1d0245895dc407c4dd7505f. At this point I am setting the uncorrelated noise rate to 30 Hz. In reality it varies between 20 and 40 Hz depending on the depth of the DOM, but the correlated noise rate is ~250 Hz so it is the dominant source. I don't think that doing a uniform 30 Hz should cause issues
