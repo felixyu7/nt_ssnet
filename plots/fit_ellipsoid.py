@@ -37,17 +37,16 @@ def f(params, pts, return_objs=False):
     else:
         return cost(pts, rotation, ellipsoid)
 
-def fit_ellipsoid(event, nhit=8):
+def fit_ellipsoid(event, nhit=8, field="filtered"):
     if len(event.total.t) <= nhit:
         return None
     else:
         from scipy.optimize import differential_evolution
         pts = np.array([
-             event.total.sensor_pos_x.to_numpy(),
-             event.total.sensor_pos_y.to_numpy(),
-             event.total.sensor_pos_z.to_numpy()
+             event[field, "sensor_pos_x"].to_numpy(),
+             event[field, "sensor_pos_y"].to_numpy(),
+             event[field, "sensor_pos_z"].to_numpy()
         ])
-        # pts = (pts.transpose() - np.mean(pts, axis=1)).transpose()
         reduced_f = lambda p: f(p, pts)
         res = differential_evolution(
             reduced_f,
