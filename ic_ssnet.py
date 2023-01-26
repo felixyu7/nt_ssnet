@@ -18,7 +18,7 @@ class SparseIceCubeNet(nn.Module):
     def network_initialization(self, in_channels, out_channels, expand, D):
         self.conv1 = nn.Sequential(
             ME.MinkowskiConvolution(
-                in_channels, 16, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                in_channels, 16, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(16),
             ME.MinkowskiReLU(inplace=True),
@@ -28,7 +28,7 @@ class SparseIceCubeNet(nn.Module):
 
         self.conv2 = nn.Sequential(
             ME.MinkowskiConvolution(
-                16, 16, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                16, 16, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(16),
             ME.MinkowskiReLU(inplace=True),
@@ -38,7 +38,7 @@ class SparseIceCubeNet(nn.Module):
         
         self.conv3 = nn.Sequential(
             ME.MinkowskiConvolution(
-                16, 32, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                16, 32, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(32),
             ME.MinkowskiReLU(inplace=True),
@@ -48,7 +48,7 @@ class SparseIceCubeNet(nn.Module):
         
         self.conv4 = nn.Sequential(
             ME.MinkowskiConvolution(
-                32, 32, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                32, 32, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(32),
             ME.MinkowskiReLU(inplace=True),
@@ -58,7 +58,7 @@ class SparseIceCubeNet(nn.Module):
         
         self.conv5 = nn.Sequential(
             ME.MinkowskiConvolution(
-                32, 32, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                32, 32, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(32),
             ME.MinkowskiReLU(inplace=True),
@@ -68,7 +68,7 @@ class SparseIceCubeNet(nn.Module):
         
         self.conv6 = nn.Sequential(
             ME.MinkowskiConvolution(
-                32, 64, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                32, 64, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(64),
             ME.MinkowskiReLU(inplace=True),
@@ -78,7 +78,7 @@ class SparseIceCubeNet(nn.Module):
         
         self.conv7 = nn.Sequential(
             ME.MinkowskiConvolution(
-                64, 64, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                64, 64, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(64),
             ME.MinkowskiReLU(inplace=True),
@@ -88,7 +88,7 @@ class SparseIceCubeNet(nn.Module):
         
         self.conv8 = nn.Sequential(
             ME.MinkowskiConvolution(
-                64, 64, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                64, 64, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(64),
             ME.MinkowskiReLU(inplace=True),
@@ -98,7 +98,7 @@ class SparseIceCubeNet(nn.Module):
 
         self.conv9 = nn.Sequential(
             ME.MinkowskiConvolution(
-                64, 128, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                64, 128, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(128),
             ME.MinkowskiReLU(inplace=True),
@@ -108,7 +108,7 @@ class SparseIceCubeNet(nn.Module):
 
         self.conv10 = nn.Sequential(
             ME.MinkowskiConvolution(
-                128, 128, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                128, 128, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(128),
             ME.MinkowskiReLU(inplace=True),
@@ -118,7 +118,7 @@ class SparseIceCubeNet(nn.Module):
 
         self.conv11 = nn.Sequential(
             ME.MinkowskiConvolution(
-                128, 128, kernel_size=3, stride=1, dimension=D, expand_coordinates=expand, dilation = 1
+                128, 128, kernel_size=3, stride=1, dimension=D, dilation = 1, expand_coordinates=expand,
             ),
             ME.MinkowskiBatchNorm(128),
             ME.MinkowskiReLU(inplace=True),
@@ -156,32 +156,36 @@ class SparseIceCubeNet(nn.Module):
         inds = torch.sort(x.C[:,0])[1]
         
         x = self.final(x)
+        # x = self.tanh(x)
         return x, inds
 
 class SparseIceCubeResNet(torch.nn.Module):
 
-    def __init__(self, in_features, out_features, reps=2, depth=8, first_num_filters=16, dropout=0., D=4):
+    def __init__(self, in_features, out_features, reps=2, depth=8, first_num_filters=16, stride=2, expand=False, dropout=0., D=4):
         super(SparseIceCubeResNet, self).__init__()
 
         self.D = D
         self.reps = reps
         self.depth = depth
         self.first_num_filters = first_num_filters
+        self.stride = stride
         self.nPlanes = [i * self.first_num_filters for i in range(1, self.depth + 1)]
 
         self.conv0 = ME.MinkowskiConvolution(
             in_channels=in_features,
             out_channels=self.first_num_filters,
-            kernel_size=3, stride=1, dimension=self.D, dilation=1,
+            kernel_size=3, stride=3, dimension=self.D, dilation=1,
             bias=False)
 
-        # self.pool = ME.MinkowskiMaxPooling(kernel_size=2, stride=2, dimension=4)
+        # self.res0 = ResNetBlock(self.first_num_filters, self.first_num_filters, kernel_size=3, expand=expand, stride=2)
+
+        self.pool = ME.MinkowskiMaxPooling(kernel_size=8, stride=8, dimension=4)
 
         self.resnet = []
         for i, planes in enumerate(self.nPlanes):
             m = []
             for _ in range(self.reps):
-                m.append(ResNetBlock(planes, planes, dropout=dropout))
+                m.append(ResNetBlock(planes, planes, expand=expand, dropout=dropout))
             m = nn.Sequential(*m)
             self.resnet.append(m)
             m = []
@@ -189,25 +193,28 @@ class SparseIceCubeResNet(torch.nn.Module):
                 m.append(ME.MinkowskiConvolution(
                     in_channels=self.nPlanes[i],
                     out_channels=self.nPlanes[i+1],
-                    kernel_size=2, stride=2, dimension=self.D,
+                    kernel_size=2, stride=2, dimension=self.D, expand_coordinates=expand,
                     bias=False))
                 m.append(ME.MinkowskiBatchNorm(self.nPlanes[i+1]))
-                m.append(ME.MinkowskiReLU())
+                m.append(ME.MinkowskiPReLU())
             m = nn.Sequential(*m)
             self.resnet.append(m)
         self.resnet = nn.Sequential(*self.resnet)
         self.glob_pool = ME.MinkowskiGlobalMaxPooling()
+        self.dropout = ME.MinkowskiDropout(0.3)
+        # self.tanh = ME.MinkowskiTanh()
         self.final = ME.MinkowskiLinear(planes, out_features, bias=True)
 
     def forward(self, x):
         x = self.conv0(x)
-        # x = self.pool(x)
-        # x = self.large_k_resnet_block(x)
+        # x = self.res0(x)
+        x = self.pool(x)
         x = self.resnet(x)
         x = self.glob_pool(x)
 
         # on cpu, store batch ordering for inference. ME bug?
         inds = torch.sort(x.C[:,0])[1]
-        
+        # x = self.dropout(x)
         x = self.final(x)
+        # x = self.tanh(x)
         return x, inds
