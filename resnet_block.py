@@ -1,3 +1,7 @@
+""" resnet_block.py - Sparse submanifold resnet blocks implemented with MinkowskiEngine
+    Felix J. Yu
+"""
+
 import torch.nn as nn
 import torch
 import MinkowskiEngine as ME
@@ -9,9 +13,7 @@ class Identity(nn.Module):
         return input
 
 class ResNetBlock(ME.MinkowskiNetwork):
-    '''
-    ResNet Block with Leaky ReLU nonlinearities.
-    '''
+    ''' Sparse Submanifold ResNet Block using MinkowskiEngine '''
     expansion = 1
 
     def __init__(self,
