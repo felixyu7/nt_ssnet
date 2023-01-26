@@ -12,7 +12,7 @@ import MinkowskiEngine as ME
 from ic_ssnet import SparseIceCubeNet, SparseIceCubeResNet
 from ic_dataset import SparseIceCubeDataset
 from ic_dataset import ic_data_prep
-from utils import angle_between, ic_collate_fn, get_p_of_bins, make_double_plot, get_mean_of_bins
+from utils import angle_between, ic_collate_fn, get_p_of_bins, get_mean_of_bins
 
 import yaml
 import glob

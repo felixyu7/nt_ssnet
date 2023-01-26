@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import MinkowskiEngine as ME
-from utils import non_scattered_hits
 
 import awkward as ak
 
@@ -77,7 +76,7 @@ def ic_data_prep(data_file):
         args: config dict, list of photon parquet files to use
         returns: awkward array of photon hit information, numpy array of true neutrino information
     """
-    
+
     tsime = time.time()
 
     photons_data = ak.from_parquet(data_file, columns=["mc_truth", "filtered"])
