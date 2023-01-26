@@ -1,9 +1,12 @@
+""" ic_dataset.py - Prometheus IceCube dataset processor for SSCNN
+    Felix J. Yu
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import MinkowskiEngine as ME
-from utils import non_scattered_hits
 
 import awkward as ak
 
@@ -34,22 +37,6 @@ class SparseIceCubeDataset(torch.utils.data.Dataset):
         # [energy, zenith, azimuth]
         label = [self.nu_data[i][0], self.nu_data[i][1], self.nu_data[i][2]]
 
-        # if self.data[i].primary_hadron_1.sensor_pos_x.to_numpy()[0] == -1:
-        #     xs = self.data[i].primary_lepton_1.sensor_pos_x.to_numpy()
-        #     ys = self.data[i].primary_lepton_1.sensor_pos_y.to_numpy()
-        #     zs = self.data[i].primary_lepton_1.sensor_pos_z.to_numpy()
-        #     ts = self.data[i].primary_lepton_1.t.to_numpy()
-        # elif self.data[i].primary_lepton_1.sensor_pos_x.to_numpy()[0] == -1:
-        #     xs = self.data[i].primary_hadron_1.sensor_pos_x.to_numpy()
-        #     ys = self.data[i].primary_hadron_1.sensor_pos_y.to_numpy()
-        #     zs = self.data[i].primary_hadron_1.sensor_pos_z.to_numpy()
-        #     ts = self.data[i].primary_hadron_1.t.to_numpy()
-        # else:    
-        #     xs = np.hstack((self.data[i].primary_lepton_1.sensor_pos_x.to_numpy(), self.data[i].primary_hadron_1.sensor_pos_x.to_numpy()))
-        #     ys = np.hstack((self.data[i].primary_lepton_1.sensor_pos_y.to_numpy(), self.data[i].primary_hadron_1.sensor_pos_y.to_numpy()))
-        #     zs = np.hstack((self.data[i].primary_lepton_1.sensor_pos_z.to_numpy(), self.data[i].primary_hadron_1.sensor_pos_z.to_numpy()))
-        #     ts = np.hstack((self.data[i].primary_lepton_1.t.to_numpy(), self.data[i].primary_hadron_1.t.to_numpy()))
-
         xs = self.data[i].filtered.sensor_pos_x.to_numpy() * 4.566
         ys = self.data[i].filtered.sensor_pos_y.to_numpy() * 4.566
         zs = self.data[i].filtered.sensor_pos_z.to_numpy() * 4.566
@@ -74,7 +61,6 @@ class SparseIceCubeDataset(torch.utils.data.Dataset):
             pos_t, feats = np.unique(pos_t, return_counts=True, axis=0)
             # feats = (feats - feats.mean()) / (feats.std() + 1e-8)
 
-        # feats = feats / feats.max()
         feats = feats.reshape(-1, 1).astype(np.float64)
 
         x = np.cos(label[2]) * np.sin(label[1])
@@ -84,10 +70,13 @@ class SparseIceCubeDataset(torch.utils.data.Dataset):
 
         return torch.from_numpy(pos_t), torch.from_numpy(feats).view(-1, 1), torch.from_numpy(np.array([label]))
 
-# function to convert read files into inputs
-# args: config dict, list of photon parquet files to use
-# returns: awkward array of photon hit information, numpy array of true neutrino information
 def ic_data_prep(data_file):
+
+    """ function to convert read files into inputs
+        args: config dict, list of photon parquet files to use
+        returns: awkward array of photon hit information, numpy array of true neutrino information
+    """
+
     tsime = time.time()
 
     photons_data = ak.from_parquet(data_file, columns=["mc_truth", "filtered"])
