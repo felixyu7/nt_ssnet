@@ -1,6 +1,6 @@
-# ic_ssnet: A Sparse Submanifold CNN for IceCube
+# nt_ssnet: A Sparse Submanifold CNN for Neutrino Telescopes
 
-This repo contains the scripts and code for the Sparse Submanifold CNN (SSCNN) project for neutrino telescope/IceCube data. The code in this repo are setup to train on and predict the direction and/or energy of the neutrino. The working environment used to implement, run and test this code are as follows:
+This repo contains the scripts and code for the Sparse Submanifold CNN (SSCNN) project for neutrino telescope data. The code in this repo are setup to train on and predict the direction and/or energy of the neutrino. The working environment used to implement, run and test this code are as follows:
 
 - Python 3.7.5
 - PyTorch 1.10.1
@@ -10,7 +10,25 @@ This repo contains the scripts and code for the Sparse Submanifold CNN (SSCNN) p
 - Awkward 1.8.0
 - yaml 5.4.1
 
-Training and inference runs can be configured with the files (train.cfg, inference.cfg). 
+Training and inference runs can be configured with the files (train.cfg, inference.cfg), and running ```python train.py```, ```python infer.py```.
+
+A brief description of the configuration file options is listed below:
+
+- device: 'cuda' or 'cpu', this option determines which hardware to run the network on (cuda for gpu, cpu for cpu)
+- model: 'angular_reco', 'energy_reco', 'both', this option determines what the final output will be (just the angle, just the energy, or both)
+- reps: int, the number of blocks each level of ResNet will have
+- depth: int, the number of depth levels ResNet will have
+- num_filters: int, the number of filters at the first level of ResNet
+- stride: int, the downsampling factor at each level of ResNet
+- train_data_file: str, the path to train data files, in .parquet format, as output from Prometheus simulation software
+- valid_data_file: str, the path to validation data files, in .parquet format, as output from Prometheus simulation software
+- batch_size: int, batch size used during training/inference
+- epochs: int, number of epochs to train
+- lr: float, initial learning rate
+- model_weights: str, path to a checkpoint file to load in previously trained weights
+- first_hit: bool, if true, preprocess data such that only the exact timing of the first hit on each optical module will be used. If false, will use all data points
+- ckpt_dir: str, path to save checkpoint files to
+- logs_file: str, path to save log files to
 
 ## Beansi: Noise module
 
