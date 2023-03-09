@@ -14,7 +14,6 @@ class Identity(nn.Module):
 
 class ResNetBlock(ME.MinkowskiNetwork):
     ''' Sparse Submanifold ResNet Block using MinkowskiEngine '''
-    expansion = 1
 
     def __init__(self,
                  in_features,
